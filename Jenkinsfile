@@ -39,6 +39,10 @@ pipeline {
         }
         stage('Build Gradle') {
             steps {
+                echo 'Permission to gradlew...'
+                script {
+                    sh 'chmod +x ./gradlew'
+                }
                 echo 'building the application...'
                 dir ('.'){
                     sh """
