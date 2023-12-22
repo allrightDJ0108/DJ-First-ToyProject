@@ -2,7 +2,7 @@ pipeline {
     agent any
     environment {
         //Server Info
-        IP = "184.72.119.103"
+        ip = "184.72.119.103"
         username = "ubuntu"
 
         //Spring Info
