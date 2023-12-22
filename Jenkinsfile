@@ -11,7 +11,7 @@ pipeline {
 
         //Docker Info
         imagename = "dj-first-toy-img"
-        dockerCredential = "docker-access-token"
+        dockerCredential = "docker-access-key"
         dockerImage = ''
         tagname = "dev"
 
