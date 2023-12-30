@@ -1,53 +1,90 @@
 package toy.project.boot.domain.api.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import toy.project.boot.domain.api.dto.ApiResponse;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.*;
 
 @RestController
 public class ApiController {
 
-    String serviceKey = "DOetYvMMk3ju0lVWP%2FlOog8gAchGS4YL6riswLmVJBMnGtps%2FQqdri3jW2KcUlra0XIH3JGRHnCwF7egRhmjfQ%3D%3D";
+    @Value("${apiServiceKey}")
+    private String apiSecretKey;
+
     @GetMapping("/api")
     public ApiResponse getData() {
+
+        String apiUrl = "http://apis.data.go.kr/6410000/busarrivalservice/getBusArrivalList";
+        String stationId = "200000078";
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(apiUrl)
+                .queryParam("serviceKey", apiSecretKey)
+                .queryParam("stationId", stationId);
+
+        String url = builder.toUriString()+"&_type=json";
+
+        System.out.println(url);
+
+        // API 호출 및 응답 처리
+        RestTemplate restTemplate = new RestTemplate();
+        String result = restTemplate.getForObject(url, String.class);
+
+        System.out.println(result);
+
+        ApiResponse apiResponse = parseXml(result);
+
+        return apiResponse;
+    }
+
+    private ApiResponse parseXml(String xmlString) {
         try {
-            StringBuilder urlBuilder = new StringBuilder("http://apis.data.go.kr/6410000/busarrivalservice/getBusArrivalList"); /*URL*/
-            urlBuilder.append("?" + URLEncoder.encode("serviceKey", "UTF-8") + "=" + serviceKey); /*Service Key*/
-            urlBuilder.append("&" + URLEncoder.encode("stationId", "UTF-8") + "=" + URLEncoder.encode("200000078", "UTF-8")); /*정류소ID*/
-            URL url = new URL(urlBuilder.toString());
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-type", "application/json");
-            System.out.println("Response code: " + conn.getResponseCode());
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(new InputSource(new StringReader(xmlString)));
 
-            BufferedReader rd;
-            if (conn.getResponseCode() >= 200 && conn.getResponseCode() <= 300) {
-                rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            } else {
-                rd = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
-            }
-            StringBuilder sb = new StringBuilder();
-            String line;
+            // XML의 msgBody에서 busArrivalList를 가져옴
+            NodeList busArrivalList = document.getElementsByTagName("busArrivalList");
 
-            ApiResponse apiResponse = new ApiResponse();
-            while ((line = rd.readLine()) != null) {
-                sb.append(line);
-                System.out.println(line);
+            if (busArrivalList.getLength() > 0) {
+                Node busArrival = busArrivalList.item(0);
+                if (busArrival.getNodeType() == Node.ELEMENT_NODE) {
+                    Element busArrivalElement = (Element) busArrival;
+
+                    // 예측 도착 시간과 남은 좌석 수를 가져옴
+                    String predictTime1 = getElementValue(busArrivalElement, "predictTime1");
+                    String remainSeatCnt1 = getElementValue(busArrivalElement, "remainSeatCnt1");
+
+                    // ApiResponse 객체에 값 설정
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse.setPredictTime1(predictTime1);
+                    apiResponse.setRemainSeatCnt1(remainSeatCnt1);
+
+                    return apiResponse;
+                }
             }
-            rd.close();
-            conn.disconnect();
-            System.out.println(sb.toString());
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
+        return null;
+    }
+
+    private String getElementValue(Element parentElement, String elementName) {
+        NodeList nodeList = parentElement.getElementsByTagName(elementName);
+        if (nodeList.getLength() > 0) {
+            return nodeList.item(0).getTextContent();
+        }
         return null;
     }
 }
